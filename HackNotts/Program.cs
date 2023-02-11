@@ -13,6 +13,7 @@ using System.Text;
 using System.Drawing;
 using System.Numerics;
 using StbImageSharp;
+using HackNotts.Simulation;
 
 class Program
 {
@@ -43,6 +44,8 @@ class Program
 
 	public int FrameNumber = 0;
 	public float GameTime = 0;
+
+	public Simulation Simulation;
 
 	Program()
 	{
@@ -77,14 +80,20 @@ class Program
 			Console.WriteLine(Marshal.PtrToStringAnsi((nint)s));
 		}
 
-		var rng = new Random();
+        Simulation = new Simulation();
+
+        var rng = new Random();
 		for (int i = 0; i < 100; i++)
 		{
 			var x = ((float)rng.NextDouble() * 2 - 1) * 20;
-			var y = ((float)rng.NextDouble() * 2 - 1) * 20;
+			var y = (float)rng.NextDouble() * 40 + 5;
 			var z = ((float)rng.NextDouble() * 2 - 1) * 20;
 
-			Ball.Balls.Add(new Ball.BallData { Pos = new vec3(x, y, z) });
+			Simulation.Balls.Add(new Simulation.Ball
+			{
+				Pos = new vec3(x, y, z),
+				Velocity = new vec3(0, (float)rng.NextDouble() * 4, 0),
+			});
 		}
 
 		//Ball.Balls.Add(new Ball.BallData { Pos = new vec3(0, 0, 0) });
@@ -185,6 +194,15 @@ class Program
             pos += right * speed * (float)dt;
         }
 
+		if (kb.IsKeyPressed(Key.Space))
+		{
+			pos.Y += speed * (float)dt;
+		}
+        if (kb.IsKeyPressed(Key.ShiftLeft))
+        {
+            pos.Y -= speed * (float)dt;
+        }
+
         float aspectRatio = (float)window.Size.X / window.Size.Y;
 		projMat = Matrix4X4.CreatePerspectiveFieldOfView(fovY, aspectRatio, nearPlaneDistance, farPlaneDistance);
 
@@ -195,12 +213,16 @@ class Program
 		//vec3 up = vec3.UnitY;
 		//viewMat = Matrix4X4.CreateLookAt(CamPos, target, up);
 
+		Simulation.Update((float)dt);
+
 		FrameNumber++;
 		GameTime = FrameNumber / 60.0f;
 	}
 	
 	private void Window_Render(double dt)
 	{
+		gl.Viewport(window.Size);
+
 		gl.ClearColor(System.Drawing.Color.CornflowerBlue);
 		gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
@@ -210,6 +232,12 @@ class Program
 		gl.Enable(EnableCap.Blend);
 		gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
+		Ball.Balls.Clear();
+		for (int i = 0; i < Simulation.Balls.Count; i++)
+		{
+			var b = Simulation.Balls[i];
+			Ball.Balls.Add(new Ball.BallData { Pos = b.Pos });
+		}
 		Ball.Draw();
 	}
 
