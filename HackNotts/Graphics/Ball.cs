@@ -17,9 +17,13 @@ namespace HackNotts.Graphics
 		static uint vao;
 		static uint vbo_pos;
 
-		static int mvpLoc;
-		static int modelLoc;
+		static int mvpsLoc;
+		static int modelsLoc;
+		static int viewLoc;
 		static int camPosLoc;
+		static int posLoc;
+		static int projLoc;
+		static int numLoc;
 
 		public class BallData
 		{
@@ -30,8 +34,23 @@ namespace HackNotts.Graphics
 
 		public static void Draw()
 		{
-			mat4 modelMat = Matrix4X4.CreateRotationY(Program.Instance.GameTime * Util.Deg2Rad(90));
-			mat4 mvp = modelMat * Program.Instance.viewMat * Program.Instance.projMat;
+			int maxBalls = 100;
+
+			mat4[] models = new mat4[maxBalls];
+			mat4[] mvps = new mat4[maxBalls];
+			vec3[] poss = new vec3[maxBalls];
+
+			for (int i = 0; i < Balls.Count; i++)
+			{
+				var ball = Balls[i];
+
+				mat4 modelMat = Matrix4X4.CreateTranslation(ball.Pos);
+				mat4 mvp = modelMat * Program.Instance.viewMat * Program.Instance.projMat;
+
+				models[i] = modelMat;
+				mvps[i] = mvp;
+				poss[i] = ball.Pos;
+			}
 
 			gl.BindVertexArray(vao);
 
@@ -39,16 +58,28 @@ namespace HackNotts.Graphics
 
 			unsafe
 			{
-				gl.UniformMatrix4(mvpLoc, 1, false, (float*)&mvp);
-				gl.UniformMatrix4(modelLoc, 1, false, (float*)&modelMat);
+				fixed (mat4* modelsp = models)
+				fixed (mat4* mvpsp = mvps)
+				fixed (vec3* posp = poss)
+				{
+					gl.UniformMatrix4(mvpsLoc, (uint)Balls.Count, false, (float*)mvpsp);
+					gl.UniformMatrix4(modelsLoc, (uint)Balls.Count, false, (float*)modelsp);
+					gl.Uniform3(posLoc, (uint)Balls.Count, (float*)posp);
+				}
 
 				vec3 camPos = Program.Instance.CamPos;
 				gl.Uniform3(camPosLoc, camPos.X, camPos.Y, camPos.Z);
-			}
 
-			gl.DrawArrays(GLEnum.Triangles, 0, 36);
+				mat4 viewMat = Program.Instance.viewMat;
+				gl.UniformMatrix4(viewLoc, 1, false, (float*)&viewMat);
 
-			Balls.Clear();
+                mat4 projMat = Program.Instance.projMat;
+                gl.UniformMatrix4(projLoc, 1, false, (float*)&projMat);
+            }
+			gl.Uniform1(numLoc, Balls.Count);
+
+			//gl.DrawArrays(GLEnum.Triangles, 0, 36);
+			gl.DrawArraysInstanced(GLEnum.Triangles, 0, 36, (uint)Balls.Count);
 		}
 
 		public static void InitResources()
@@ -56,9 +87,13 @@ namespace HackNotts.Graphics
 			unsafe
 			{
 				shader = Shader.FromFiles("Assets/Shaders/ball.vert", "Assets/Shaders/ball.frag");
-				mvpLoc = gl.GetUniformLocation(shader.program, "u_mvp");
-				modelLoc = gl.GetUniformLocation(shader.program, "u_model");
+				mvpsLoc = gl.GetUniformLocation(shader.program, "u_mvps");
+				modelsLoc = gl.GetUniformLocation(shader.program, "u_models");
 				camPosLoc = gl.GetUniformLocation(shader.program, "u_camPos");
+				viewLoc = gl.GetUniformLocation(shader.program, "u_view");
+				posLoc = gl.GetUniformLocation(shader.program, "u_pos");
+				projLoc = gl.GetUniformLocation(shader.program, "u_proj");
+				numLoc = gl.GetUniformLocation(shader.program, "u_num");
 
 				vao = gl.GenVertexArray();
 				gl.BindVertexArray(vao);

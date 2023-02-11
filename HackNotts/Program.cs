@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Drawing;
 using System.Numerics;
+using StbImageSharp;
 
 class Program
 {
@@ -75,7 +76,57 @@ class Program
 			byte* s = gl.GetString(GLEnum.Version);
 			Console.WriteLine(Marshal.PtrToStringAnsi((nint)s));
 		}
+
+		var rng = new Random();
+		for (int i = 0; i < 100; i++)
+		{
+			var x = ((float)rng.NextDouble() * 2 - 1) * 20;
+			var y = ((float)rng.NextDouble() * 2 - 1) * 20;
+			var z = ((float)rng.NextDouble() * 2 - 1) * 20;
+
+			Ball.Balls.Add(new Ball.BallData { Pos = new vec3(x, y, z) });
+		}
+
+		//Ball.Balls.Add(new Ball.BallData { Pos = new vec3(0, 0, 0) });
+		//Ball.Balls.Add(new Ball.BallData { Pos = new vec3(2, 0, 0) });
+
+		LoadSky(new string[]
+		{
+			"Assets/skybox/right.jpg",
+			"Assets/skybox/left.jpg",
+			"Assets/skybox/top.jpg",
+			"Assets/skybox/bottom.jpg",
+			"Assets/skybox/front.jpg",
+			"Assets/skybox/back.jpg",
+		});
 	}
+
+	uint skyTex;
+	void LoadSky(string[] paths)
+	{
+		skyTex = gl.GenTexture();
+		gl.ActiveTexture(GLEnum.Texture0);
+		gl.BindTexture(GLEnum.TextureCubeMap, skyTex);
+
+		for (int i = 0; i < 6; i++)
+		{
+			var img = ImageResult.FromStream(File.OpenRead(paths[i]), ColorComponents.RedGreenBlue);
+			
+			unsafe
+			{
+				fixed (void* p = img.Data)
+				{
+					gl.TexImage2D(GLEnum.TextureCubeMapPositiveX + i, 0, (int)GLEnum.Rgb, (uint)img.Width, (uint)img.Height, 0, GLEnum.Rgb, GLEnum.UnsignedByte, p);
+				}
+			}
+		}
+
+        gl.TexParameter(GLEnum.TextureCubeMap, GLEnum.TextureMinFilter, (int)GLEnum.Linear);
+        gl.TexParameter(GLEnum.TextureCubeMap, GLEnum.TextureMagFilter, (int)GLEnum.Linear);
+        gl.TexParameter(GLEnum.TextureCubeMap, GLEnum.TextureWrapS, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(GLEnum.TextureCubeMap, GLEnum.TextureWrapT, (int)GLEnum.ClampToEdge);
+        gl.TexParameter(GLEnum.TextureCubeMap, GLEnum.TextureWrapR, (int)GLEnum.ClampToEdge);
+    }
 
 	private void Window_Update(double dt)
 	{
@@ -150,16 +201,15 @@ class Program
 	
 	private void Window_Render(double dt)
 	{
-		gl.ClearColor(Color.CornflowerBlue);
+		gl.ClearColor(System.Drawing.Color.CornflowerBlue);
 		gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
 		gl.Enable(EnableCap.DepthTest);
-		gl.Enable(EnableCap.CullFace);
+		//gl.Enable(EnableCap.CullFace);
 		
 		gl.Enable(EnableCap.Blend);
 		gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-		Ball.Balls.Add(new Ball.BallData { Pos = new vec3(0, 0, 0) });
 		Ball.Draw();
 	}
 
